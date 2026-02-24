@@ -1,0 +1,35 @@
+--- CURRENT BRANCH --- 
+* main 56e0e59 Merge remote-tracking branch 'origin/main'
+ 
+--- LS REMOTE --- 
+d317cfcb4f97e65b5edcf89021f2c28c52407ede	HEAD
+d317cfcb4f97e65b5edcf89021f2c28c52407ede	refs/heads/main
+ 
+--- FETCH --- 
+POST git-upload-pack (193 bytes)
+From https://github.ecodesamsung.com/SRIB-PRISM/IXR_Prismatics
+ = [up to date]      main       -> origin/main
+ 
+--- STATUS --- 
+On branch main
+All conflicts fixed but you are still merging.
+  (use "git commit" to conclude merge)
+
+Changes to be committed:
+	new file:   Journey360_Final (1).pdf
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	check_git.bat
+	diagnose_push.bat
+	git_state.txt
+	push_log.txt
+
+ 
+--- LOG --- 
+*   56e0e59 Merge remote-tracking branch 'origin/main'
+|\  
+| * 65de57f Initial commit
+* 27f950c Final commit
+* e0a6c2e Allow Vercel CORS
+* d9db226 Rename safety folder to fix casing issue

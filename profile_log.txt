@@ -1,0 +1,5 @@
+Starting Profile Debug
+DEBUG: Attempting to update profile for uid=test_user_debug
+DEBUG: Update Result: matched=0, modified=0, upserted=6975b04e1f66be69a5080495
+SUCCESS: Profile saved successfully in DB.
+DEBUG: Test user cleaned up.

@@ -1,0 +1,7 @@
+DEBUG: Script started
+DEBUG: Paths added: ['c:\\Users\\gowth\\Desktop\\Samsung_Prism\\Journey360\\backend', 'C:\\Users\\gowth\\AppData\\Local\\Programs\\Python\\Python313\\python313.zip', 'C:\\Users\\gowth\\AppData\\Local\\Programs\\Python\\Python313\\DLLs', 'C:\\Users\\gowth\\AppData\\Local\\Programs\\Python\\Python313\\Lib', 'C:\\Users\\gowth\\AppData\\Local\\Programs\\Python\\Python313', 'C:\\Users\\gowth\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages', 'C:\\Users\\gowth\\Desktop\\Samsung_Prism\\Journey360', 'C:\\Users\\gowth\\Desktop\\Samsung_Prism\\Journey360\\backend']
+DEBUG: Dotenv loaded
+DEBUG: Attempting to import call_llm...
+DEBUG: Import successful
+Testing AI Connection...
+SUCCESS: {'message': 'hello', '_used_model': 'google/gemini-flash-latest'}

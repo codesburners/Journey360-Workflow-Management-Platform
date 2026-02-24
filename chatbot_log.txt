@@ -1,0 +1,4 @@
+Starting Log
+DEBUG: Testing Chatbot Exception
+Calling assistant function:
+{'reply': "I'm having trouble connecting to my travel brain right now. It might be a model configuration issue or API quota. Please try again."}

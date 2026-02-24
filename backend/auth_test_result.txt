@@ -1,0 +1,1 @@
+Auth chain test completed. Check console output above.

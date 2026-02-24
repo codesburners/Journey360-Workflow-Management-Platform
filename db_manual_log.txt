@@ -1,0 +1,6 @@
+Starting DB Log
+DEBUG: Attempting connection...
+SUCCESS: Connected to MongoDB!
+DEBUG: Database: journey360
+DEBUG: Collections: ['itineraries', 'trips']
+DEBUG: Users count: 0

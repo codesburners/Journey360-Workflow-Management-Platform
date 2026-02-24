@@ -1,0 +1,6 @@
+Attempting password: 'password123' ...
+❌ Failed: bad auth : authentication failed, full error: {'ok': 0, 'errmsg': 'bad auth : authentication failed', 'code': 8000, 'codeName': 'AtlasError'}
+Attempting password: 'password@123' ...
+✅ Connection Successful!
+Valid URI found.
+✅ backend/.env automatically updated with the correct password.

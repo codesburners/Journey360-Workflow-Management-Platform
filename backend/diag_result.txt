@@ -1,0 +1,37 @@
+1. auth.firebase OK
+2. auth.dependencies OK
+3. python-jose OK
+4. trips.routes OK (2 routes)
+5. users.routes OK (7 routes)
+6. main.app FAILED: No module named 'openrouter_client'
+Traceback (most recent call last):
+  File "C:\Users\gowth\Pictures\Journey360\backend\main.py", line 92, in <module>
+    from backend.trips.routes import router as trips_router
+ModuleNotFoundError: No module named 'backend.trips'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\gowth\Pictures\Journey360\backend\ai\routes.py", line 3, in <module>
+    from backend.database.db import trips_collection, itineraries_collection
+ModuleNotFoundError: No module named 'backend.database'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\gowth\Pictures\Journey360\backend\ai\itinerary.py", line 2, in <module>
+    from backend.services.places import get_places, get_coordinates
+ModuleNotFoundError: No module named 'backend.services'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\gowth\Pictures\Journey360\backend\test_auth_chain.py", line 46, in <module>
+    from main import app
+  File "C:\Users\gowth\Pictures\Journey360\backend\main.py", line 98, in <module>
+    from ai.routes import router as ai_router
+  File "C:\Users\gowth\Pictures\Journey360\backend\ai\routes.py", line 14, in <module>
+    from ai.itinerary import generate_itinerary
+  File "C:\Users\gowth\Pictures\Journey360\backend\ai\itinerary.py", line 16, in <module>
+    from openrouter_client import call_openrouter
+ModuleNotFoundError: No module named 'openrouter_client'

@@ -1,0 +1,32 @@
+Cleaning test cache...
+
+--- TEST 1: First Generation (Fresh) ---
+DEBUG: Checking cache for TestCacheCity (3 days)...
+DEBUG: Cache MISS.
+
+>>> ITINERARY GENERATION ENGINE V2.2 <<<
+STARTING ITINERARY GENERATION for TestCacheCity (3 days)
+DEBUG: Searching hotels in TestCacheCity (2026-01-25 to 2026-01-28)...
+DEBUG: Filtering out duplicate: Cafe Sandoz - N Block, CP
+DEBUG: Filtering out duplicate: Fine Dining in TestCacheCity
+DEBUG: Filtering out duplicate: Cafe Sandoz - N Block, CP
+DEBUG: Filtering out duplicate: The Mandi Chowk
+DEBUG: Filtering out duplicate: Fine Dining in TestCacheCity
+DEBUG: Injecting 5 real hotels from SerpApi.
+COMPLETED ITINERARY GENERATION
+
+Gen 1 took 7.00s
+Result 1 ID: 6d63746d-f141-4cbb-a5ff-2797b3d2f347
+Is Cached? False
+
+--- TEST 2: Second Generation (Same parameters, different user) ---
+DEBUG: Checking cache for TestCacheCity (3 days)...
+DEBUG: Cache HIT! Found itinerary 6d63746d-f141-4cbb-a5ff-2797b3d2f347
+DEBUG: Reusing cached itinerary. New ID: f764b51f-5d44-4c36-822e-39aca870ba88
+Gen 2 took 0.00s
+Result 2 ID: f764b51f-5d44-4c36-822e-39aca870ba88
+Is Cached? True
+PASSED: Used cache!
+PERFORMANCE: Cache is fast!
+
+Cleaning up...
