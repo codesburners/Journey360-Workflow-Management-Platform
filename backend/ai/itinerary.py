@@ -355,7 +355,7 @@ def get_mock_itinerary(trip, note="Mock response", real_hotels=None, real_restau
 
 import time
 
-def call_llm(prompt, trip):
+def call_llm(prompt, trip, raw_json=False):
     start_time = time.time()
     def log(msg):
         timestamp = time.strftime('%H:%M:%S')
@@ -367,13 +367,18 @@ def call_llm(prompt, trip):
             pass
 
     if os.getenv("MOCK_AI") == "true" or os.getenv("OFFLINE_MODE") == "true":
-        return get_mock_itinerary(trip, real_hotels=trip.get("_real_hotels"), real_restaurants=trip.get("_real_restaurants"), real_attractions=trip.get("_real_attractions"))
+        mock = get_mock_itinerary(trip, real_hotels=trip.get("_real_hotels"), real_restaurants=trip.get("_real_restaurants"), real_attractions=trip.get("_real_attractions"))
+        return json.dumps(mock) if raw_json else mock
 
     default_models = [
         "google/gemini-2.0-flash",             # (FREE) Primary High Performance
         "google/gemini-2.0-flash-lite",        # (FREE) Faster fallback
         "google/gemini-1.5-flash",             # (FREE) Stable Flash fallback
         "google/gemini-1.5-pro",               # (FREE) Last resort Pro
+        "openrouter/google/gemini-2.0-flash-lite:free", # OpenRouter Free fallback
+        "openrouter/google/gemini-2.0-flash:free",      # OpenRouter Free fallback
+        "openrouter/meta-llama/llama-3.3-70b-instruct:free", # Llama fallback
+        "openrouter/deepseek/deepseek-r1:free"          # DeepSeek fallback
     ]
 
     duration = trip.get('days', 3)
@@ -387,7 +392,8 @@ def call_llm(prompt, trip):
             try:
                 log(f"Sending request to {model_name} - Attempt {attempt + 1}...")
                 
-                if "gemini" in model_name and "google" in model_name:
+                # Use Google Gen AI SDK ONLY for direct google/ IDs
+                if model_name.startswith("google/") and "openrouter" not in model_name:
                     # Use Google Gen AI SDK directly
                     # clean model name: "google/gemini-1.5-flash" -> "gemini-1.5-flash"
                     google_model_id = model_name.replace("google/", "")
@@ -407,7 +413,10 @@ def call_llm(prompt, trip):
                     )
                     res_text = response.text if response.text else None
                 else:
-                    res_text = call_openrouter(prompt, model=model_name)
+                    # Use OpenRouter for everything else
+                    # clean model name: "openrouter/google/gemini-2.0-flash:free" -> "google/gemini-2.0-flash:free"
+                    or_model_id = model_name.replace("openrouter/", "")
+                    res_text = call_openrouter(prompt, model=or_model_id)
                 
                 if not res_text:
                     log(f"Model {model_name} returned empty. Trying next model...")
@@ -429,10 +438,15 @@ def call_llm(prompt, trip):
                     log("WARNING: JSON parsing failed. Attempting robust repair...")
                     text = repair_json(text)
                     parsed = json.loads(text)
+                
                 if not isinstance(parsed, dict):
                     raise Exception("AI returned invalid data format (not a dictionary).")
                     
                 log(f"JSON parsed successfully from {model_name}.")
+                
+                if raw_json:
+                    return text
+                
                 parsed["_used_model"] = model_name
                 return parsed
 

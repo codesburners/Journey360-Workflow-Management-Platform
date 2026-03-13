@@ -20,8 +20,28 @@ except ImportError:
     from utils.geo import haversine
     from services.reviews import get_place_reviews
 from fastapi import Query as FastQuery
+import re
 
 router = APIRouter()
+
+# --- Input Sanitization Helpers ---
+def sanitize_text(text: str, max_length: int = 2000) -> str:
+    """Strip, truncate, and remove dangerous patterns from user input."""
+    if not text:
+        return ""
+    text = text.strip()[:max_length]
+    # Remove potential prompt injection patterns
+    text = re.sub(r'(?i)(ignore previous|forget all|system prompt|you are now)', '', text)
+    return text
+
+def validate_trip_id(trip_id: str) -> str:
+    """Validate trip ID format."""
+    if not trip_id or not trip_id.strip():
+        raise HTTPException(status_code=400, detail="Trip ID is required")
+    trip_id = trip_id.strip()[:100]
+    if not re.match(r'^[a-zA-Z0-9_-]+$', trip_id):
+        raise HTTPException(status_code=400, detail="Invalid trip ID format")
+    return trip_id
 
 @router.get("/ai/place-reviews")
 def place_reviews(place_name: str = FastQuery(...), destination: str = FastQuery(...), user=Depends(get_current_user)):
@@ -63,6 +83,7 @@ def get_ar_nearby(trip_id: str, lat: float, lng: float, radius: float = 1000, us
 
 @router.post("/ai/itinerary/generate")
 def generate(trip_id: str, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
+    trip_id = validate_trip_id(trip_id)
     trip = trips_collection.find_one({"trip_id": trip_id, "user_id": user["uid"]})
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
@@ -109,12 +130,15 @@ def get_itinerary(trip_id: str, user=Depends(get_current_user)):
 
 @router.post("/ai/itinerary/regenerate")
 def regenerate(data: dict, background_tasks: BackgroundTasks, user=Depends(get_current_user)):
-    trip_id = data.get("tripId")
-    instruction = data.get("instruction")
+    trip_id = data.get("tripId", "")
+    instruction = data.get("instruction", "")
     constraints = data.get("constraints", {})
-    
-    if not trip_id or not instruction:
-        raise HTTPException(status_code=400, detail="tripId and instruction are required")
+
+    # Validate & sanitize inputs
+    trip_id = validate_trip_id(trip_id)
+    instruction = sanitize_text(instruction, max_length=1000)
+    if not instruction:
+        raise HTTPException(status_code=400, detail="Instruction is required")
         
     trip = trips_collection.find_one({"trip_id": trip_id, "user_id": user["uid"]})
     if not trip:
@@ -149,8 +173,14 @@ def regenerate(data: dict, background_tasks: BackgroundTasks, user=Depends(get_c
 
 @router.post("/ai/chat")
 def chat(message: str, trip_id: str = None, user=Depends(get_current_user)):
+    # Validate & sanitize chat message
+    message = sanitize_text(message, max_length=2000)
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
     trip_context = None
     if trip_id:
+        trip_id = validate_trip_id(trip_id)
         trip_context = trips_collection.find_one({"trip_id": trip_id, "user_id": user["uid"]})
     
     return chat_with_assistant(message, trip_context)
@@ -165,6 +195,9 @@ def summary(trip_id: str, user=Depends(get_current_user)):
 
 @router.post("/ai/safety/assess")
 def safety(location: str, user=Depends(get_current_user)):
+    location = sanitize_text(location, max_length=200)
+    if not location:
+        raise HTTPException(status_code=400, detail="Location is required")
     return assess_safety(location)
 
 @router.get("/ai/dashboard/context")

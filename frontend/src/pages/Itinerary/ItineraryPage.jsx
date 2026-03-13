@@ -2,17 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Search, MapPin, Calendar, MoreHorizontal, Plus, Minus,
     Utensils, Flag, Star, Clock, Info, ChevronRight,
-    Shield, Share, Save, Loader2, Navigation, ExternalLink, Map as MapIcon, Sparkles
+    Shield, Share, Save, Loader2, Navigation, ExternalLink, Map as MapIcon, Sparkles, X
 } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { auth } from '../../services/firebase';
 import { apiService } from '../../services/apiService';
 import AppLayout from '../../components/layout/AppLayout';
+import Skeleton, { ItinerarySkeleton } from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
 import ARViewer from '../../components/navigation/ARViewer';
 import MobilePreviewModal from '../../components/navigation/MobilePreviewModal';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import CostChart from '../../components/itinerary/CostChart';
+import { toast } from 'sonner';
 
 // Fix for default marker icon in Leaflet - Use CDNs for maximum reliability in Vite
 const DefaultIcon = L.icon({
@@ -264,11 +268,22 @@ function optimizePlaceOrder(places) {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-const TimelineEvent = ({ event, index, total, onLocate, onLaunchAR, sourceCurrencyCode, targetCurrencyCode, isSaved, onToggleSave, launchingPlace }) => {
+const TimelineEvent = ({
+    event, index, total, onLocate, onLaunchAR, sourceCurrencyCode,
+    targetCurrencyCode, isSaved, onToggleSave, launchingPlace,
+    onDragStart, onDragOver, onDrop, onDragEnd, draggable = true
+}) => {
     const isHotel = event.category?.toLowerCase() === 'hotel';
 
     return (
-        <div className="flex gap-6 relative group">
+        <div
+            className="flex gap-6 relative group"
+            draggable={draggable && !isHotel}
+            onDragStart={(e) => onDragStart && onDragStart(e, index)}
+            onDragOver={(e) => onDragOver && onDragOver(e, index)}
+            onDrop={(e) => onDrop && onDrop(e, index)}
+            onDragEnd={(e) => onDragEnd && onDragEnd(e)}
+        >
             {/* Connector Line */}
             {index !== total - 1 && (
                 <div className="absolute left-[19px] top-10 bottom-[-24px] w-0.5 bg-slate-200 group-hover:bg-emerald-100 transition-colors"></div>
@@ -310,6 +325,17 @@ const TimelineEvent = ({ event, index, total, onLocate, onLaunchAR, sourceCurren
                     <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-3">
                         {event.description || "Explore this amazing location suggested by AI."}
                     </p>
+
+                    {/* Photo Gallery (Mini) */}
+                    {event.imageUrl && (
+                        <div className="mb-4 rounded-2xl overflow-hidden h-32 w-full border border-slate-100 dark:border-slate-700">
+                            <img
+                                src={event.imageUrl}
+                                alt={event.name}
+                                className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500"
+                            />
+                        </div>
+                    )}
 
                     {/* Rating & Reviews */}
                     {event.rating && (
@@ -429,6 +455,7 @@ const ItineraryPage = () => {
     const [itinerary, setItinerary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeDay, setActiveDay] = useState(1);
+    const [activeView, setActiveView] = useState('timeline'); // 'timeline' | 'calendar' | 'budget'
     const [regenerating, setRegenerating] = useState(false);
     const [mapMarker, setMapMarker] = useState(null);
     const [mapCenter, setMapCenter] = useState([20, 0]);
@@ -601,6 +628,51 @@ const ItineraryPage = () => {
         }
     };
 
+    const handleShare = () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(() => {
+            toast.success('Itinerary link copied to clipboard!');
+        }).catch(err => {
+            toast.error('Failed to copy link');
+        });
+    };
+
+    // Drag and Drop Logic
+    const [draggedItemIndex, setDraggedItemIndex] = useState(null);
+
+    const handleDragStart = (e, index) => {
+        setDraggedItemIndex(index);
+        e.dataTransfer.effectAllowed = "move";
+        // Visual ghosting for better UX
+        e.target.style.opacity = "0.5";
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+    };
+
+    const handleDrop = (e, index) => {
+        e.preventDefault();
+        if (draggedItemIndex === null || draggedItemIndex === index) return;
+
+        const newItinerary = { ...itinerary };
+        const dayIdx = newItinerary.days.findIndex(d => d.dayNumber === activeDay);
+        if (dayIdx === -1) return;
+
+        const dayPlaces = [...newItinerary.days[dayIdx].places];
+        const [movedItem] = dayPlaces.splice(draggedItemIndex, 1);
+        dayPlaces.splice(index, 0, movedItem);
+
+        newItinerary.days[dayIdx].places = dayPlaces;
+        setItinerary(newItinerary);
+        setDraggedItemIndex(null);
+        toast.info('Plan rearranged!');
+    };
+
+    const handleDragEnd = (e) => {
+        e.target.style.opacity = "1";
+    };
+
     const handleLaunchAR = (place) => {
         if (place.lat && place.lng) {
             // Brief launching animation before opening the modal
@@ -661,16 +733,19 @@ const ItineraryPage = () => {
 
     if (loading) return (
         <AppLayout>
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader2 className="animate-spin text-emerald-600" size={48} />
-            </div>
+            <ItinerarySkeleton />
         </AppLayout>
     );
 
     if (!itinerary) return (
         <AppLayout>
-            <div className="flex items-center justify-center min-h-screen">
-                <p>No itinerary found.</p>
+            <div className="max-w-4xl mx-auto py-20 px-6">
+                <div className="bg-white/20 dark:bg-slate-900/20 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                    <EmptyState
+                        variant="itinerary"
+                        onAction={() => setIsRegenModalOpen(true)}
+                    />
+                </div>
             </div>
         </AppLayout>
     );
@@ -721,6 +796,14 @@ const ItineraryPage = () => {
                             ))}
 
                             <button
+                                onClick={handleShare}
+                                className="flex items-center gap-2 px-5 py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors whitespace-nowrap"
+                            >
+                                <Share size={18} />
+                                Share
+                            </button>
+
+                            <button
                                 onClick={() => setIsRegenModalOpen(true)}
                                 disabled={regenerating}
                                 className="flex items-center gap-2 px-6 py-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-bold rounded-xl border-2 border-emerald-100 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors whitespace-nowrap disabled:opacity-50"
@@ -731,270 +814,327 @@ const ItineraryPage = () => {
                         </div>
                     </div>
 
-                    {/* Main Content Grid */}
-                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 h-[calc(100vh-280px)] min-h-[600px]">
-
-                        {/* Left: Itinerary List */}
-                        <div className="xl:col-span-5 h-full overflow-hidden flex flex-col">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Itinerary Details</h2>
-                                <button
-                                    onClick={handleOptimize}
-                                    title={optimizedDays ? 'Restore original AI order' : 'Reorder stops to minimize travel distance'}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${optimizedDays
-                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/30'
-                                        : 'bg-white/80 dark:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                                        }`}
-                                >
-                                    <Navigation size={12} />
-                                    {optimizedDays ? 'Optimized ✓' : 'Optimize Route'}
-                                </button>
-                            </div>
-
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar max-w-[260px] sm:max-w-[400px] lg:max-w-full pb-2">
-                                    {itinerary.days.map(day => (
-                                        <button
-                                            key={day.dayNumber}
-                                            onClick={() => setActiveDay(day.dayNumber)}
-                                            className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all whitespace-nowrap ${activeDay === day.dayNumber
-                                                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
-                                                : 'bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800'
-                                                }`}
-                                        >
-                                            Day {day.dayNumber}
-                                        </button>
-                                    ))}
-                                </div>
-                                {/* Day total distance badge */}
-                                {(() => {
-                                    const km = getDayTotalKm(currentDayData.places);
-                                    return km > 0 ? (
-                                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                                            ~{km.toFixed(1)} km total
-                                        </span>
-                                    ) : null;
-                                })()}
-                            </div>
-
-                            <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-md rounded-3xl border border-slate-200/50 dark:border-slate-800/50 shadow-sm p-6 flex-1 overflow-y-auto custom-scrollbar">
-                                <div className="mb-6">
-                                    <div className="flex items-center gap-3 mb-1.5">
-                                        <Calendar className="w-4 h-4 text-emerald-500" />
-                                        <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">{currentDayData.date || `Day ${currentDayData.dayNumber}`}</span>
-                                    </div>
-                                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-50">{currentDayData.weatherNote}</h3>
-                                </div>
-
-                                <div className="pl-2">
-                                    {currentDayData.places.map((place, index) => {
-                                        const nextPlace = currentDayData.places[index + 1];
-                                        const distKm = (nextPlace && place.lat && place.lng && nextPlace.lat && nextPlace.lng)
-                                            ? haversineKm(
-                                                parseFloat(place.lat), parseFloat(place.lng),
-                                                parseFloat(nextPlace.lat), parseFloat(nextPlace.lng)
-                                            )
-                                            : null;
-                                        return (
-                                            <React.Fragment key={index}>
-                                                <TimelineEvent
-                                                    event={place}
-                                                    index={index}
-                                                    total={currentDayData.places.length}
-                                                    onLocate={handleLocate}
-                                                    onLaunchAR={handleLaunchAR}
-                                                    sourceCurrencyCode={sourceCurrencyCode}
-                                                    targetCurrencyCode={targetCurrency}
-                                                    isSaved={savedPlacesMap.has(place.name)}
-                                                    onToggleSave={handleToggleSave}
-                                                    launchingPlace={launchingPlace}
-                                                />
-                                                {distKm !== null && (
-                                                    <div className="flex items-center gap-1.5 pl-14 pb-1 -mt-6 mb-1">
-                                                        <Navigation size={10} className="text-emerald-400 shrink-0" />
-                                                        <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                                                            {distKm < 1
-                                                                ? `${Math.round(distKm * 1000)} m to next stop`
-                                                                : `${distKm.toFixed(1)} km to next stop`}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </React.Fragment>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Right: Map */}
-                        <div className="xl:col-span-7 h-full relative group rounded-3xl overflow-hidden border border-slate-200/50 dark:border-slate-800/50 shadow-lg bg-emerald-50/10 dark:bg-slate-900/20 min-h-[500px]">
-                            <MapContainer
-                                center={mapCenter}
-                                zoom={mapZoom}
-                                scrollWheelZoom={true}
-                                style={{ height: '100%', minHeight: '600px', width: '100%', zIndex: 0 }}
-                                className="h-full w-full outline-none"
+                    {/* View Switcher */}
+                    <div className="flex items-center gap-1 p-1 bg-slate-100/50 dark:bg-slate-800/30 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 rounded-2xl w-fit mb-8">
+                        {['timeline', 'calendar', 'budget'].map(view => (
+                            <button
+                                key={view}
+                                onClick={() => setActiveView(view)}
+                                className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all capitalize ${activeView === view
+                                    ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-400 border border-slate-200/50 dark:border-slate-600'
+                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                    }`}
                             >
-                                <TileLayer
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                                />
-                                <ForceResize center={mapCenter} zoom={mapZoom} />
+                                {view}
+                            </button>
+                        ))}
+                    </div>
 
-                                {currentDayData.places.map((place, idx) => (
-                                    place.lat && place.lng && (
-                                        <Marker
-                                            key={`marker-${activeDay}-${idx}`}
-                                            position={[place.lat, place.lng]}
-                                        >
-                                            <Popup>
-                                                <div className="p-1 min-w-[120px] dark:text-slate-100">
-                                                    <p className="font-bold text-sm mb-1">{place.name}</p>
-                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2">{place.timeSlot}</p>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (place.lat && place.lng) handleLaunchAR(place);
-                                                        }}
-                                                        disabled={!(place.lat && place.lng)}
-                                                        title={(place.lat && place.lng) ? 'Launch AR Navigation' : 'No coordinates available'}
-                                                        className={`w-full py-2.5 px-4 text-[10px] font-bold tracking-widest uppercase rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${(place.lat && place.lng)
-                                                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-400 hover:to-teal-400 shadow-lg shadow-emerald-500/20 hover:scale-[1.03] active:scale-95 cursor-pointer border-none'
-                                                            : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
-                                                            }`}
-                                                    >
-                                                        <Sparkles size={12} className="animate-pulse" />
-                                                        AR Launch
-                                                    </button>
-                                                </div>
-                                            </Popup>
-                                        </Marker>
-                                    )
-                                ))}
+                    {activeView === 'timeline' && (
+                        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 h-[calc(100vh-340px)] min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-                                {/* Dashed polyline connecting places in visit order */}
-                                {(() => {
-                                    const positions = currentDayData.places
-                                        .filter(p => p.lat && p.lng)
-                                        .map(p => [parseFloat(p.lat), parseFloat(p.lng)]);
-                                    return positions.length > 1 ? (
-                                        <Polyline
-                                            positions={positions}
-                                            pathOptions={{ color: '#10b981', weight: 4.5, dashArray: '8 6', opacity: 0.9 }}
-                                        />
-                                    ) : null;
-                                })()}
+                            {/* Left: Itinerary List */}
+                            <div className="xl:col-span-5 h-full overflow-hidden flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Itinerary Details</h2>
+                                    <button
+                                        onClick={handleOptimize}
+                                        title={optimizedDays ? 'Restore original AI order' : 'Reorder stops to minimize travel distance'}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${optimizedDays
+                                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-500/30'
+                                            : 'bg-white/80 dark:bg-slate-800/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                                            }`}
+                                    >
+                                        <Navigation size={12} />
+                                        {optimizedDays ? 'Optimized ✓' : 'Optimize Route'}
+                                    </button>
+                                </div>
 
-                                {mapMarker && mapMarker.lat && (
-                                    <AutoPopupMarker
-                                        position={[mapMarker.lat, mapMarker.lng]}
-                                        label={mapMarker.label}
-                                        bookingUrl={mapMarker.bookingUrl}
-                                        timestamp={mapMarker.timestamp}
-                                        onLaunchAR={handleLaunchAR}
-                                    />
-                                )}
-
-                                <FocusView dayPlaces={currentDayData.places} />
-                            </MapContainer>
-
-                            {/* Top Hotels Section */}
-                            {itinerary.topHotels && itinerary.topHotels.length > 0 && (
-                                <div className={`absolute top-4 left-4 z-20 transition-all duration-300 ${showHotels ? 'w-80' : 'w-12'}`}>
-                                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-3xl shadow-2xl border border-white/50 dark:border-slate-700/50 overflow-hidden">
-                                        <div className="flex items-center justify-between p-4 border-b border-slate-100/50">
-                                            {showHotels ? (
-                                                <div className="flex items-center gap-2">
-                                                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                                                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Recommended Stays</h3>
-                                                </div>
-                                            ) : (
-                                                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                                            )}
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar max-w-[260px] sm:max-w-[400px] lg:max-w-full pb-2">
+                                        {itinerary.days.map(day => (
                                             <button
-                                                onClick={() => setShowHotels(!showHotels)}
-                                                className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors"
+                                                key={day.dayNumber}
+                                                onClick={() => setActiveDay(day.dayNumber)}
+                                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all whitespace-nowrap ${activeDay === day.dayNumber
+                                                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
+                                                    : 'bg-white/80 dark:bg-slate-800/50 backdrop-blur-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                                    }`}
                                             >
-                                                {showHotels ? <ChevronRight className="rotate-180 w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                                Day {day.dayNumber}
                                             </button>
-                                        </div>
+                                        ))}
+                                    </div>
+                                    {/* Day total distance badge */}
+                                    {(() => {
+                                        const km = getDayTotalKm(currentDayData.places);
+                                        return km > 0 ? (
+                                            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                                                ~{km.toFixed(1)} km total
+                                            </span>
+                                        ) : null;
+                                    })()}
+                                </div>
 
-                                        {showHotels && (
-                                            <div className="p-4 flex flex-col gap-3 max-h-[400px] overflow-y-auto no-scrollbar">
-                                                {itinerary.topHotels?.slice(0, 6).map((hotel, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        onClick={() => handleLocate(hotel)}
-                                                        className="w-full bg-white/80 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-50 dark:border-slate-700/30 shadow-sm flex flex-col gap-3 hover:border-teal-200 dark:hover:border-teal-500/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/90 transition-all cursor-pointer group/hotel"
-                                                    >
-                                                        <div className="flex gap-3 items-center">
-                                                            <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600 text-lg group-hover/hotel:scale-110 transition-transform relative">
-                                                                🏨
+                                <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-md rounded-3xl border border-slate-200/50 dark:border-slate-800/50 shadow-sm p-6 flex-1 overflow-y-auto custom-scrollbar">
+                                    <div className="mb-6">
+                                        <div className="flex items-center gap-3 mb-1.5">
+                                            <Calendar className="w-4 h-4 text-emerald-500" />
+                                            <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">{currentDayData.date || `Day ${currentDayData.dayNumber}`}</span>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-50">{currentDayData.weatherNote}</h3>
+                                    </div>
+
+                                    <div className="pl-2">
+                                        {currentDayData.places.map((place, index) => {
+                                            const nextPlace = currentDayData.places[index + 1];
+                                            const distKm = (nextPlace && place.lat && place.lng && nextPlace.lat && nextPlace.lng)
+                                                ? haversineKm(
+                                                    parseFloat(place.lat), parseFloat(place.lng),
+                                                    parseFloat(nextPlace.lat), parseFloat(nextPlace.lng)
+                                                )
+                                                : null;
+                                            return (
+                                                <React.Fragment key={index}>
+                                                    <TimelineEvent
+                                                        event={place}
+                                                        index={index}
+                                                        total={currentDayData.places.length}
+                                                        onLocate={handleLocate}
+                                                        onLaunchAR={handleLaunchAR}
+                                                        sourceCurrencyCode={sourceCurrencyCode}
+                                                        targetCurrencyCode={targetCurrency}
+                                                        isSaved={savedPlacesMap.has(place.name)}
+                                                        onToggleSave={handleToggleSave}
+                                                        launchingPlace={launchingPlace}
+                                                        onDragStart={handleDragStart}
+                                                        onDragOver={handleDragOver}
+                                                        onDrop={handleDrop}
+                                                        onDragEnd={handleDragEnd}
+                                                    />
+                                                    {distKm !== null && (
+                                                        <div className="flex items-center gap-1.5 pl-14 pb-1 -mt-6 mb-1">
+                                                            <Navigation size={10} className="text-emerald-400 shrink-0" />
+                                                            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                                                                {distKm < 1
+                                                                    ? `${Math.round(distKm * 1000)} m to next stop`
+                                                                    : `${distKm.toFixed(1)} km to next stop`}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right: Map */}
+                            <div className="xl:col-span-7 h-full relative group rounded-3xl overflow-hidden border border-slate-200/50 dark:border-slate-800/50 shadow-lg bg-emerald-50/10 dark:bg-slate-900/20 min-h-[500px]">
+                                <MapContainer
+                                    center={mapCenter}
+                                    zoom={mapZoom}
+                                    scrollWheelZoom={true}
+                                    style={{ height: '100%', minHeight: '600px', width: '100%', zIndex: 0 }}
+                                    className="h-full w-full outline-none"
+                                >
+                                    <TileLayer
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                                    />
+                                    <ForceResize center={mapCenter} zoom={mapZoom} />
+
+                                    {currentDayData.places.map((place, idx) => (
+                                        place.lat && place.lng && (
+                                            <Marker
+                                                key={`marker-${activeDay}-${idx}`}
+                                                position={[place.lat, place.lng]}
+                                            >
+                                                <Popup>
+                                                    <div className="p-1 min-w-[120px] dark:text-slate-100">
+                                                        <p className="font-bold text-sm mb-1">{place.name}</p>
+                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2">{place.timeSlot}</p>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (place.lat && place.lng) handleLaunchAR(place);
+                                                            }}
+                                                            disabled={!(place.lat && place.lng)}
+                                                            title={(place.lat && place.lng) ? 'Launch AR Navigation' : 'No coordinates available'}
+                                                            className={`w-full py-2.5 px-4 text-[10px] font-bold tracking-widest uppercase rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${(place.lat && place.lng)
+                                                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-400 hover:to-teal-400 shadow-lg shadow-emerald-500/20 hover:scale-[1.03] active:scale-95 cursor-pointer border-none'
+                                                                : 'bg-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                                                                }`}
+                                                        >
+                                                            <Sparkles size={12} className="animate-pulse" />
+                                                            AR Launch
+                                                        </button>
+                                                    </div>
+                                                </Popup>
+                                            </Marker>
+                                        )
+                                    ))}
+
+                                    {/* Dashed polyline connecting places in visit order */}
+                                    {(() => {
+                                        const positions = currentDayData.places
+                                            .filter(p => p.lat && p.lng)
+                                            .map(p => [parseFloat(p.lat), parseFloat(p.lng)]);
+                                        return positions.length > 1 ? (
+                                            <Polyline
+                                                positions={positions}
+                                                pathOptions={{ color: '#10b981', weight: 4.5, dashArray: '8 6', opacity: 0.9 }}
+                                            />
+                                        ) : null;
+                                    })()}
+
+                                    {mapMarker && mapMarker.lat && (
+                                        <AutoPopupMarker
+                                            position={[mapMarker.lat, mapMarker.lng]}
+                                            label={mapMarker.label}
+                                            bookingUrl={mapMarker.bookingUrl}
+                                            timestamp={mapMarker.timestamp}
+                                            onLaunchAR={handleLaunchAR}
+                                        />
+                                    )}
+
+                                    <FocusView dayPlaces={currentDayData.places} />
+                                </MapContainer>
+
+                                {/* Top Hotels Section */}
+                                {itinerary.topHotels && itinerary.topHotels.length > 0 && (
+                                    <div className={`absolute top-4 left-4 z-20 transition-all duration-300 ${showHotels ? 'w-80' : 'w-12'}`}>
+                                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-3xl shadow-2xl border border-white/50 dark:border-slate-700/50 overflow-hidden">
+                                            <div className="flex items-center justify-between p-4 border-b border-slate-100/50">
+                                                {showHotels ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                                                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Recommended Stays</h3>
+                                                    </div>
+                                                ) : (
+                                                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                                                )}
+                                                <button
+                                                    onClick={() => setShowHotels(!showHotels)}
+                                                    className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors"
+                                                >
+                                                    {showHotels ? <ChevronRight className="rotate-180 w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+
+                                            {showHotels && (
+                                                <div className="p-4 flex flex-col gap-3 max-h-[400px] overflow-y-auto no-scrollbar">
+                                                    {itinerary.topHotels?.slice(0, 6).map((hotel, idx) => (
+                                                        <div key={idx} className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm hover:border-emerald-200 transition-all group/hotel">
+                                                            <div
+                                                                className="flex gap-3 group/hotel cursor-pointer mb-3"
+                                                                onClick={() => handleLocate({ ...hotel, category: 'hotel' })}
+                                                            >
+                                                                <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 border border-slate-200/50">
+                                                                    {hotel.image ? (
+                                                                        <img src={hotel.image} alt={hotel.name} className="w-full h-full object-cover group-hover/hotel:scale-110 transition-transform" />
+                                                                    ) : (
+                                                                        <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                                                            <MapPin size={24} />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate mb-1">{hotel.name}</h4>
+                                                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 capitalize">
+                                                                        <span className="flex items-center gap-0.5"><Star size={8} className="text-amber-500 fill-amber-500" /> {hotel.rating || '4.5'}</span>
+                                                                        <span>• {hotel.price || 'Premium'}</span>
+                                                                    </div>
+                                                                    <span className="text-xs font-black text-teal-600 dark:text-teal-400 mt-0.5 block">
+                                                                        <PriceDisplay amount={hotel.price} sourceCode={sourceCurrencyCode} targetCode={targetCurrency} />
+                                                                    </span>
+                                                                </div>
+                                                                <div className="self-center">
+                                                                    <ExternalLink size={10} className="text-slate-300 group-hover/hotel:text-emerald-500" />
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex gap-2 pt-2 border-t border-slate-50 dark:border-slate-700">
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        handleToggleSave(hotel);
+                                                                        const url = hotel.bookingUrl || `https://www.google.com/search?q=${encodeURIComponent(hotel.name + ' ' + itinerary.destination + ' booking')}`;
+                                                                        window.open(url, '_blank');
                                                                     }}
-                                                                    className={`absolute -top-2 -right-2 p-1 rounded-full shadow-sm border ${savedPlacesMap.has(hotel.name)
-                                                                        ? 'bg-rose-50 border-rose-100 text-rose-500'
-                                                                        : 'bg-white border-slate-100 text-slate-300 hover:text-rose-500'
-                                                                        }`}
+                                                                    className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm"
                                                                 >
-                                                                    <Save size={12} className={savedPlacesMap.has(hotel.name) ? "fill-current" : ""} />
+                                                                    <ExternalLink size={12} />
+                                                                    Book Now
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleLocate({ ...hotel, category: 'hotel' });
+                                                                    }}
+                                                                    className="flex-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 hover:border-teal-200 dark:hover:border-teal-500/50 text-slate-600 dark:text-slate-300 hover:text-teal-600 dark:hover:text-teal-400 text-xs font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1.5"
+                                                                >
+                                                                    <MapIcon size={12} />
+                                                                    Locate
                                                                 </button>
                                                             </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex justify-between items-start">
-                                                                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{hotel.name}</h4>
-                                                                    <div className="flex items-center gap-0.5 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-md">
-                                                                        <Star className="w-2 h-2 text-amber-500 fill-amber-500" />
-                                                                        <span className="text-[8px] font-bold text-amber-700 dark:text-amber-400">{hotel.rating}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{hotel.vibe || hotel.description}</p>
-                                                                <span className="text-xs font-black text-teal-600 dark:text-teal-400 mt-0.5 block">
-                                                                    <PriceDisplay amount={hotel.price} sourceCode={sourceCurrencyCode} targetCode={targetCurrency} />
-                                                                </span>
-                                                            </div>
                                                         </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
-                                                        <div className="flex gap-2 pt-2 border-t border-slate-50">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    const url = hotel.bookingUrl || `https://www.google.com/search?q=${encodeURIComponent(hotel.name + ' ' + itinerary.destination + ' booking')}`;
-                                                                    window.open(url, '_blank');
-                                                                }}
-                                                                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-teal-200"
-                                                            >
-                                                                <ExternalLink size={12} />
-                                                                Book Now
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleLocate(hotel);
-                                                                }}
-                                                                className="flex-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 hover:border-teal-200 dark:hover:border-teal-500/50 text-slate-600 dark:text-slate-300 hover:text-teal-600 dark:hover:text-teal-400 text-xs font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1.5"
-                                                            >
-                                                                <MapIcon size={12} />
-                                                                Locate
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                    {activeView === 'calendar' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+                            {itinerary.days.map(day => (
+                                <div key={day.dayNumber} className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-sm p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col min-h-[300px]">
+                                    <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                                        <span className="text-xl font-black text-emerald-500">Day {day.dayNumber}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">{day.date || 'Scheduled'}</span>
+                                    </div>
+                                    <div className="flex-1 flex flex-col gap-3">
+                                        {day.places?.map((place, pIdx) => (
+                                            <div key={pIdx} className="flex items-center gap-3">
+                                                <div className={`w-2 h-2 rounded-full ${place.category === 'hotel' ? 'bg-amber-400' : 'bg-emerald-400'}`}></div>
+                                                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{place.name}</span>
                                             </div>
+                                        ))}
+                                        {(!day.places || day.places.length === 0) && (
+                                            <div className="text-xs text-slate-400 italic">No activities planned</div>
                                         )}
                                     </div>
+                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                        <div className="text-[10px] text-slate-400 mb-1">Estimated Cost</div>
+                                        <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                            <PriceDisplay
+                                                amount={day.totalDayCost || (day.places?.reduce((sum, p) => sum + (parseFloat(p.price || p.cost || 0)), 0)) || 0}
+                                                sourceCode={sourceCurrencyCode}
+                                                targetCode={targetCurrency}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
-
+                            ))}
                         </div>
-                    </div>
+                    )}
+
+                    {activeView === 'budget' && (
+                        <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+                            <CostChart
+                                costSummary={itinerary.costSummary}
+                                dailyCosts={itinerary.days}
+                                currencySymbol={targetCurrency === 'INR' ? '₹' : '$'}
+                            />
+                        </div>
+                    )}
                 </main>
             </div>
 
-            {/* Direct Full Screen AR (Optional fallback) */}
+            {/* Modals & Overlays */}
             {activeAR && (
                 <ARViewer
                     destination={activeAR}
@@ -1002,7 +1142,6 @@ const ItineraryPage = () => {
                 />
             )}
 
-            {/* Mobile Preview Modal */}
             {previewAR && (
                 <MobilePreviewModal
                     isOpen={!!previewAR}
@@ -1011,7 +1150,6 @@ const ItineraryPage = () => {
                 />
             )}
 
-            {/* AI Regeneration Modal */}
             <RegenModal
                 isOpen={isRegenModalOpen}
                 onClose={() => setIsRegenModalOpen(false)}

@@ -1,0 +1,4 @@
+User-Agent: *
+Allow: /
+
+Sitemap: https://journey-beta-two.vercel.app/sitemap.xml

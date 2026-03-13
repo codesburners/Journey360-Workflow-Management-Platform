@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Loader2, Calendar } from 'lucide-react';
+import { MapPin, Calendar } from 'lucide-react';
 import { auth } from '../../services/firebase';
 import { apiService } from '../../services/apiService';
 import { useNavigate } from 'react-router-dom';
 import velloreImage from '../../assets/images/vellore_image.png';
+import Skeleton from '../ui/Skeleton';
 
 const RecentTrips = () => {
     const navigate = useNavigate();
@@ -37,8 +38,11 @@ const RecentTrips = () => {
     }, []);
 
     if (loading) return (
-        <div className="flex justify-center py-10">
-            <Loader2 className="animate-spin text-emerald-600" />
+        <div className="space-y-4">
+            <div className="flex justify-between items-center">
+                <div className="bg-slate-200 h-6 w-24 rounded-lg animate-pulse" />
+            </div>
+            <Skeleton variant="list-item" count={3} />
         </div>
     );
 

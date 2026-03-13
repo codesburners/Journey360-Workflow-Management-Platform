@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Loader2, Calendar, ChevronRight, Search, Plus } from 'lucide-react';
+import { Loader2, Calendar, ChevronRight, Search, Plus } from 'lucide-react';
 import { auth } from '../../services/firebase';
 import { apiService } from '../../services/apiService';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/layout/AppLayout';
-
 import velloreImage from '../../assets/images/vellore_image.png';
+import Skeleton from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
 
 const MyTripsPage = () => {
     const navigate = useNavigate();
@@ -45,9 +46,6 @@ const MyTripsPage = () => {
 
     // Helper logic to get image
     const getTripImage = (trip) => {
-        // Debug logging
-        // console.log("Trip Dest:", trip.destination, "Vellore Image:", velloreImage);
-
         if (trip.destination && trip.destination.toLowerCase().trim() === 'vellore') return velloreImage;
         return trip.image_url;
     };
@@ -85,27 +83,24 @@ const MyTripsPage = () => {
                         <div className="flex items-center gap-6 px-4 border-l border-white/20 dark:border-slate-700 hidden md:flex">
                             <div className="text-center">
                                 <div className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-wider">Total Trips</div>
-                                <div className="text-xl font-bold text-slate-900 dark:text-white">{trips.length}</div>
+                                <div className="text-xl font-bold text-slate-900 dark:text-white">{loading ? '...' : trips.length}</div>
                             </div>
                         </div>
                     </div>
 
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center py-20 bg-white/20 dark:bg-slate-900/20 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
-                            <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
-                            <p className="text-slate-500 dark:text-gray-400 font-medium">Retrieving your travel history...</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[1, 2, 3, 4, 5, 6].map(i => (
+                                <Skeleton key={i} variant="card" />
+                            ))}
                         </div>
                     ) : filteredTrips.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 bg-white/20 dark:bg-slate-900/20 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
-                            <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-4xl">🌎</div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No trips found</h3>
-                            <p className="text-slate-500 dark:text-gray-400 mb-8 max-w-xs text-center">Ready to start your next adventure? AI is here to help you plan everything.</p>
-                            <button
-                                onClick={() => navigate('/dashboard')}
-                                className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
-                            >
-                                Create your first trip →
-                            </button>
+                        <div className="bg-white/20 dark:bg-slate-900/20 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                            <EmptyState
+                                variant={searchTerm ? "search" : "trips"}
+                                title={searchTerm ? "No trips matching your search" : undefined}
+                                description={searchTerm ? `We couldn't find any trips to "${searchTerm}".` : undefined}
+                            />
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

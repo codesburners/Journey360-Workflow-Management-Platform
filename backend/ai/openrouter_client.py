@@ -27,7 +27,7 @@ def call_openrouter(prompt, system_prompt=None, model="openai/gpt-oss-120b:free"
         "messages": messages,
         "temperature": 0.7,
         "top_p": 0.95,
-        "max_tokens": 1700  # Adjusted for remaining user credits
+        "max_tokens": 8000  # Enough for full itinerary JSON
     }
 
     try:

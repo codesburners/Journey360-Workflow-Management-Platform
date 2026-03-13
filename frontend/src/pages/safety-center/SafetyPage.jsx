@@ -7,6 +7,8 @@ import AlertList from '../../components/safety/AlertList';
 import AppLayout from '../../components/layout/AppLayout';
 import { auth } from '../../services/firebase';
 import { apiService } from '../../services/apiService';
+import Skeleton from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
 
 const SafetyPage = () => {
     const [location, setLocation] = useState("");
@@ -158,8 +160,11 @@ const SafetyPage = () => {
                     </div>
 
                     {loading ? (
-                        <div className="flex justify-center py-20">
-                            <Loader2 className="animate-spin text-blue-600" size={48} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                            {[1, 2, 3].map(i => <Skeleton key={i} variant="stat" />)}
+                            <div className="lg:col-span-3">
+                                <Skeleton variant="card" count={3} />
+                            </div>
                         </div>
                     ) : assessment ? (
                         <>
@@ -271,36 +276,27 @@ const SafetyPage = () => {
                     ) : (
                         error ? (
                             <div className="flex flex-col items-center justify-center py-24 text-center">
-                                <div className="bg-red-50 dark:bg-red-900/20 w-20 h-20 rounded-full flex items-center justify-center mb-6">
-                                    <ShieldAlert size={40} className="text-red-500 dark:text-red-400" />
-                                </div>
-                                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Safety System Offline</h3>
-                                <p className="text-red-500 dark:text-red-400 max-w-md mx-auto mb-8 bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30 font-mono text-sm text-wrap break-words">
-                                    {error}
-                                </p>
-                                <div className="flex gap-2">
-                                    <button onClick={() => fetchSafety(location)} className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full transition-colors">
+                                <div className="bg-white/20 dark:bg-slate-900/20 backdrop-blur-sm rounded-3xl border border-dashed border-red-200 dark:border-red-900/30 p-8">
+                                    <div className="bg-red-50 dark:bg-red-900/20 w-20 h-20 rounded-full flex items-center justify-center mb-6 mx-auto">
+                                        <ShieldAlert size={40} className="text-red-500 dark:text-red-400" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Safety System Error</h3>
+                                    <p className="text-red-500 dark:text-red-400 max-w-md mx-auto mb-8 bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30 font-mono text-sm text-wrap break-words">
+                                        {error}
+                                    </p>
+                                    <button onClick={() => fetchSafety(location)} className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all active:scale-95">
                                         Retry Connection
                                     </button>
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-24 text-center">
-                                <div className="bg-blue-50 dark:bg-blue-900/20 w-20 h-20 rounded-full flex items-center justify-center mb-6">
-                                    <ShieldAlert size={40} className="text-blue-500 dark:text-blue-400" />
-                                </div>
-                                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Safety Intelligence Grid</h3>
-                                <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-8">
-                                    Enter a city to activate real-time threat monitoring and safety assessments.
-                                </p>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setLocation("Paris, France")} className="text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2 rounded-full transition-colors text-slate-600 dark:text-slate-300">
-                                        Trial: Paris
-                                    </button>
-                                    <button onClick={() => setLocation("New York, USA")} className="text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2 rounded-full transition-colors text-slate-600 dark:text-slate-300">
-                                        Trial: New York
-                                    </button>
-                                </div>
+                            <div className="bg-white/20 dark:bg-slate-900/20 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                                <EmptyState
+                                    variant="safety"
+                                    color="emerald"
+                                    onAction={() => setLocation("Paris, France")}
+                                    ctaLabel="Try Paris"
+                                />
                             </div>
                         )
                     )}

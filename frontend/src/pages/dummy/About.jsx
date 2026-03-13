@@ -6,7 +6,6 @@ import Footer from '../../components/layout/Footer';
 import aaronImage from '../../assets/images/aaron.jpg';
 import gowthamImage from '../../assets/images/gowtham.jpg';
 import karthikImage from '../../assets/images/karthik_new.jpg';
-import sandhiyaImage from '../../assets/images/sandhiya.png';
 
 const AboutContent = () => {
     return (
@@ -127,7 +126,7 @@ const AboutContent = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12 max-w-5xl mx-auto">
                     {[
                         {
                             name: "Aaron Alphons Thomas",
@@ -146,12 +145,6 @@ const AboutContent = () => {
                             image: karthikImage,
                             linkedin: "https://www.linkedin.com/in/kaarthik-m-47198728a",
                             imgStyle: { objectPosition: "center top", transform: "scale(2.4) translateY(15px)" }
-                        },
-                        {
-                            name: "Sandhiya Umapathi",
-                            image: sandhiyaImage,
-                            linkedin: "https://www.linkedin.com/in/sandhiyaumapathi/",
-                            imgStyle: { objectPosition: "center center", transform: "scale(0.9)" }
                         }
                     ].map((dev, idx) => (
                         <div key={idx} className="bg-white/95 dark:bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 text-center border-t border-l border-white dark:border-slate-800 shadow-[0_15px_50px_rgba(0,0,0,0.03)] dark:shadow-none hover:shadow-[0_30px_60px_rgba(16,185,129,0.12)] hover:scale-[1.03] hover:-translate-y-2 transition-all duration-500 group flex flex-col items-center">

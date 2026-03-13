@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import AppLayout from '../../components/layout/AppLayout';
 import { Bookmark, MapPin, Trash2, ExternalLink, Star } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { auth } from '../../services/firebase';
+import AppLayout from '../../components/layout/AppLayout';
+import Skeleton from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
 
 const SavedPlaces = () => {
     const [places, setPlaces] = useState([]);
@@ -33,7 +35,7 @@ const SavedPlaces = () => {
         try {
             setLoading(true);
             const data = await apiService.getSavedPlaces(auth);
-            setPlaces(data);
+            setPlaces(data || []);
         } catch (err) {
             console.error("Failed to fetch saved places:", err);
             setError("Failed to load your saved places.");
@@ -55,8 +57,14 @@ const SavedPlaces = () => {
     if (loading) {
         return (
             <AppLayout>
-                <div className="p-8 flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                <div className="p-8 pb-24 max-w-7xl mx-auto space-y-8">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                        <div className="bg-slate-200 h-10 w-48 rounded-lg animate-pulse" />
+                        <div className="bg-slate-200 h-10 w-96 rounded-lg animate-pulse" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} variant="card" />)}
+                    </div>
                 </div>
             </AppLayout>
         );
@@ -108,14 +116,12 @@ const SavedPlaces = () => {
                 )}
 
                 {!loading && places.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-gray-300 dark:border-slate-700">
-                        <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-full mb-4">
-                            <Bookmark size={32} className="text-gray-400" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No saved places yet</h3>
-                        <p className="text-gray-500 dark:text-gray-400 max-w-sm text-center">
-                            Save interesting locations from your itineraries to see them here.
-                        </p>
+                    <div className="bg-white/20 dark:bg-slate-900/20 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                        <EmptyState
+                            variant={searchQuery ? "search" : "saved"}
+                            title={searchQuery ? "No saved places match your search" : undefined}
+                            description={searchQuery ? `We couldn't find any saved places matching "${searchQuery}".` : undefined}
+                        />
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
